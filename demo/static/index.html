@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>French Trainer · toward TCF B2</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1>French Trainer</h1>
+      <div class="muted">Personalized practice · goal: TCF Canada B2</div>
+    </div>
+    <div class="header-right">
+      <span class="level-chip">Your level: <b id="level-label">A1</b></span>
+      <span id="providers" class="muted">…</span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="chat">Chat</button>
+    <button class="tab" data-tab="exercise">Exercise</button>
+    <button class="tab" data-tab="learned">What I've learned</button>
+  </nav>
+
+  <main>
+    <!-- ============ CHAT ============ -->
+    <section class="tabpane" id="tab-chat">
+      <p class="muted small">Talk to your tutor about what you know or want to learn.
+        It teaches you and saves concepts to <b>What I've learned</b> as you go.</p>
+      <div id="chat-log" class="chat-log"></div>
+      <div class="chat-input">
+        <textarea id="chat-text" placeholder="e.g. I know 'être'. Teach me to conjugate 'traduire'. (Enter to send, Shift+Enter for newline)"></textarea>
+        <div class="row">
+          <button id="chat-send" class="primary">Send</button>
+          <button id="chat-reset" class="tiny">Reset chat</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ EXERCISE ============ -->
+    <section class="tabpane hidden" id="tab-exercise">
+      <div class="toolbar">
+        <div class="skills">
+          <button data-skill="reading" class="skill active">Reading</button>
+          <button data-skill="listening" class="skill">Listening</button>
+          <button data-skill="writing" class="skill">Writing</button>
+          <button data-skill="speaking" class="skill">Speaking</button>
+        </div>
+        <input id="topic" placeholder="Topic (optional): food, travel…" />
+        <button id="generate" class="primary">New exercise</button>
+      </div>
+      <div id="ground-note" class="ground-note hidden"></div>
+      <div id="card" class="card hidden"></div>
+      <div id="result" class="result hidden"></div>
+    </section>
+
+    <!-- ============ WHAT I'VE LEARNED ============ -->
+    <section class="tabpane hidden" id="tab-learned">
+      <div class="panel">
+        <div class="row">
+          <label>Current level
+            <select id="level-select">
+              <option>A1</option><option>A2</option><option>B1</option>
+              <option>B2</option><option>C1</option><option>C2</option>
+            </select>
+          </label>
+          <button id="suggest-level" class="tiny">Suggest from what I know</button>
+        </div>
+
+        <div class="learned-head">
+          <h3 id="known-head">Known concepts</h3>
+          <button id="refresh-known" class="tiny">↻ Refresh</button>
+        </div>
+        <div id="known"><span class="muted">Loading…</span></div>
+
+        <h3>Quick add (with confirmation)</h3>
+        <p class="muted small">Type in plain English. I'll suggest concepts and ask
+          before saving anything.</p>
+        <textarea id="intake-text" placeholder="e.g. I can say hello/goodbye, count to 20, and use 'être' in the present tense"></textarea>
+        <div class="row"><button id="analyze" class="primary">Analyze</button></div>
+        <div id="proposals"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
