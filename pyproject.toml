@@ -1,0 +1,33 @@
+[project]
+name = "language-quiz-generator"
+version = "0.1.0"
+description = "LLM-powered language learning: chat intake, SM-2 spaced repetition, async quiz generation"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "gradio",
+    "sqlalchemy",
+    "alembic",
+    "psycopg[binary]",
+    "pydantic-settings",
+    "httpx",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 100
+# demo/ is a frozen prototype; alembic/versions/ follows Alembic's generated template
+exclude = ["demo", "alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
