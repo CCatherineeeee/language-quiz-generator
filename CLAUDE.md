@@ -4,9 +4,11 @@ Resume portfolio project (targets: AI engineer and backend engineer roles). An L
 
 ## Read before implementing
 
-1. [document/features.md](document/features.md) — what to build, with P0/P1/P2 priorities. Build P0 first.
-2. [document/planning.md](document/planning.md) — data schema, data flows, and the **Decision Log**. Decisions there are settled; do not re-open them unless requirements change.
-3. [document/design_suggestions.md](document/design_suggestions.md) — rationale behind decisions and interview one-liners.
+1. [document/progress.md](document/progress.md) — **current status, conventions, and what to build next. Start here, and update it at the end of every session.**
+2. [document/features.md](document/features.md) — what to build, with P0/P1/P2 priorities. Build P0 first.
+3. [document/planning.md](document/planning.md) — data schema, data flows, and the **Decision Log**. Decisions there are settled; do not re-open them unless requirements change.
+4. [document/design_suggestions.md](document/design_suggestions.md) — rationale behind decisions and interview one-liners.
+5. [document/prompt_devlog.md](document/prompt_devlog.md) — prompt version history and live-testing findings.
 
 ## Ground rules
 
