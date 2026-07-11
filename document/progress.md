@@ -62,4 +62,8 @@ live LLM probe through Groq succeeds.
 ## Deferred decisions
 
 - Hosting platform (requirement: always-on, no cold start).
-- GitHub remote not created yet; everything is local.
+
+## Remote
+
+Public repo: https://github.com/CCatherineeeee/language-quiz-generator
+(origin over SSH). Push after each committed slice.
