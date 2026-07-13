@@ -1,0 +1,5 @@
+{"id": "bare-polysemous-word", "text": "I learned the word soirée", "expected": {"is_ambiguous": true, "min_candidates": 2}, "note": "soirée = the evening / an evening party; nothing in the message resolves it"}
+{"id": "polysemous-french-frame", "text": "j'ai appris le mot temps", "expected": {"is_ambiguous": true, "min_candidates": 2}, "note": "temps = time / weather; fully French input must work too"}
+{"id": "meaning-stated-by-user", "text": "I learned soirée, it means an evening party", "expected": {"is_ambiguous": false, "min_candidates": 0}, "note": "user already resolved the ambiguity; asking again would be annoying"}
+{"id": "single-dominant-meaning", "text": "I learned the word arbre", "expected": {"is_ambiguous": false, "min_candidates": 0}, "note": "false-positive guard: one dominant meaning"}
+{"id": "grammar-point", "text": "I learned passé composé with avoir", "expected": {"is_ambiguous": false, "min_candidates": 0}, "note": "grammar structures are not word-sense ambiguous"}

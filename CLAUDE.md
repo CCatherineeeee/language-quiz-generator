@@ -10,6 +10,11 @@ Resume portfolio project (targets: AI engineer and backend engineer roles). An L
 4. [document/design_suggestions.md](document/design_suggestions.md) — rationale behind decisions and interview one-liners.
 5. [document/prompt_devlog.md](document/prompt_devlog.md) — prompt version history and live-testing findings.
 
+## Working practices (every session)
+
+- **Document settled debates.** Whenever a design question is debated and agreement is reached, record it in [document/design_choise.md](document/design_choise.md) in plain, easy language: what was decided, why, and the alternative that was rejected. That file is the user's interview-prep notes. Never rewrite or restyle entries the user wrote themselves — append, or suggest corrections in chat.
+- **Periodic grilling.** After each major completed slice, offer to run /grill-me so the user can practice defending the design and implementation under interview-style questioning before moving on.
+
 ## Ground rules
 
 - `demo/` is an exploratory prototype, kept for reference only. The real app is a fresh build (its multi-LLM fallback client is a pattern worth porting). Shared Neon database is fine — demo tables are prefixed `demo_`.

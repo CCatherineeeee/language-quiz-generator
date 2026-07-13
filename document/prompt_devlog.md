@@ -47,3 +47,22 @@ prompt wording against this could regress other cases.
 
 All 4 probe cases (+ expected outputs) are seeded into the golden dataset:
 evals/golden/input_check.jsonl.
+
+## AMBIGUITY_SYSTEM_V1 (2026-07-12)
+
+Purpose: Analysis Layer stage 2 — detect when a reported language item has
+several distinct meanings and nothing in the message resolves which one the
+user learned (features.md's soirée example). Verdict-only by design: the prompt
+explicitly forbids guessing the likely meaning; resolution comes from the
+user's answer to clarification_question.
+
+Iteration findings (live probe, 5 cases via Groq/llama-3.3-70b): 5/5 pass on
+the first version — both ambiguous cases (soirée, temps) triggered with two
+clean candidates + a usable clarification question; meaning-stated,
+single-meaning, and grammar-point cases all stayed quiet.
+
+Code-side guard (mirrors stage 1's no-op filter): an is_ambiguous=true verdict
+with fewer than 2 candidates can't be acted on, so check_ambiguity() coerces it
+to unambiguous. Not yet observed live; added defensively.
+
+Probe cases seeded into evals/golden/ambiguity.jsonl.

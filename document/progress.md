@@ -40,12 +40,17 @@ live LLM probe through Groq succeeds.
   -> hand-review the script (mandatory) -> `uv run alembic upgrade head`
 - Commit per working slice; messages explain the why.
 
+4. Input pipeline stage 2 (ambiguity check, 2026-07-13):
+   - `check_ambiguity()` + `POST /api/input/ambiguity`; verdict-only by design
+     (LLM never guesses the meaning; user's answer resolves it)
+   - AMBIGUITY_SYSTEM_V1: 5/5 live probe on first version (see prompt_devlog)
+   - <2-candidates guard; goldens in `evals/golden/ambiguity.jsonl`; 16 tests
+   - CLAUDE.md working practices added: document settled debates in
+     design_choise.md; offer /grill-me after major slices
+
 ## Next up (P0 remaining, in build order)
 
-1. **Ambiguity check** (Analysis Layer stage 2): `is_ambiguous` +
-   clarification short-circuit (soirée: evening vs party). Same pattern as
-   stage 1: Pydantic schema + versioned prompt + live probe + golden cases.
-2. **Linguistic meta-extractor**: extract `linguistic_metadata` JSON +
+1. **Linguistic meta-extractor**: extract `linguistic_metadata` JSON +
    related-form suggestions (conjugations, plural, gender).
 3. **Storage flow** ("A New Word is Learned", planning.md): write
    global_dictionary + user_mastery_matrix rows; enqueue NEW_ITEM_ADDED job in

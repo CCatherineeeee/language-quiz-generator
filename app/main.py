@@ -3,7 +3,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from .db import engine
-from .services.analysis import InputCheckResult, check_input
+from .services.analysis import (
+    AmbiguityResult,
+    InputCheckResult,
+    check_ambiguity,
+    check_input,
+)
 
 app = FastAPI(title="Language Quiz Generator")
 
@@ -27,11 +32,21 @@ class InputCheckRequest(BaseModel):
     text: str = Field(min_length=1)
 
 
-@app.post("/api/input/check")
-def input_check(req: InputCheckRequest) -> InputCheckResult:
-    if len(req.text) > MAX_INPUT_CHARS:
+def _guard_length(text: str) -> None:
+    if len(text) > MAX_INPUT_CHARS:
         raise HTTPException(
             status_code=413,
-            detail=f"Input too long ({len(req.text)} chars, max {MAX_INPUT_CHARS}).",
+            detail=f"Input too long ({len(text)} chars, max {MAX_INPUT_CHARS}).",
         )
+
+
+@app.post("/api/input/check")
+def input_check(req: InputCheckRequest) -> InputCheckResult:
+    _guard_length(req.text)
     return check_input(req.text)
+
+
+@app.post("/api/input/ambiguity")
+def input_ambiguity(req: InputCheckRequest) -> AmbiguityResult:
+    _guard_length(req.text)
+    return check_ambiguity(req.text)
