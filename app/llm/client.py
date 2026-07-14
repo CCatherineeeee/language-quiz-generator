@@ -41,6 +41,18 @@ def _is_quota(status: int, body: str) -> bool:
     )
 
 
+def _is_transient(status: int, body: str) -> bool:
+    """Provider hiccups worth one same-provider retry (never quota errors).
+
+    Observed live (prompt_devlog V3): Groq JSON mode intermittently dies with
+    400 json_validate_failed ("max completion tokens reached before generating
+    a valid document") — the model looped; the next attempt usually succeeds.
+    """
+    if status >= 500:
+        return True
+    return "json_validate_failed" in body.lower()
+
+
 def parse_json(content: str):
     """Tolerant JSON parse: strips ```json fences and surrounding prose."""
     s = content.strip()
@@ -96,27 +108,37 @@ class LLMClient:
 
         last_err = None
         for i, p in enumerate(providers):
-            t0 = time.time()
-            try:
-                content = self._call_provider(p, messages, json_mode, temperature, timeout)
-                self.log_call(provider=p.name, model=p.model, purpose=purpose,
-                              ok=True, error=None, latency_ms=int((time.time() - t0) * 1000))
-                return {"content": content, "provider": p.name, "model": p.model}
-            except Exception as e:  # noqa: BLE001 - fall through to the next provider
-                status = getattr(getattr(e, "response", None), "status_code", 0)
-                body = getattr(getattr(e, "response", None), "text", str(e))
-                self.log_call(provider=p.name, model=p.model, purpose=purpose,
-                              ok=False, error=str(e)[:300],
-                              latency_ms=int((time.time() - t0) * 1000))
-                last_err = e
-                nxt = providers[i + 1] if i + 1 < len(providers) else None
-                if nxt is None:
-                    self.notify("error", f"All LLM providers failed. Last error on "
-                                         f"'{p.name}': {str(e)[:120]}")
+            # Two attempts per provider, but the second only for transient
+            # failures (never quota — those go straight to the fallback).
+            for attempt in (1, 2):
+                t0 = time.time()
+                try:
+                    content = self._call_provider(p, messages, json_mode, temperature, timeout)
+                    self.log_call(provider=p.name, model=p.model, purpose=purpose,
+                                  ok=True, error=None,
+                                  latency_ms=int((time.time() - t0) * 1000))
+                    return {"content": content, "provider": p.name, "model": p.model}
+                except Exception as e:  # noqa: BLE001 - retry or fall through
+                    status = getattr(getattr(e, "response", None), "status_code", 0)
+                    body = getattr(getattr(e, "response", None), "text", str(e))
+                    self.log_call(provider=p.name, model=p.model, purpose=purpose,
+                                  ok=False, error=str(e)[:300],
+                                  latency_ms=int((time.time() - t0) * 1000))
+                    last_err = e
+                    if attempt == 1 and not _is_quota(status, body) and _is_transient(status, body):
+                        self.notify("transient_retry",
+                                    f"'{p.name}' transient failure ({status}). Retrying once.")
+                        continue
+                    nxt = providers[i + 1] if i + 1 < len(providers) else None
+                    if nxt is None:
+                        self.notify("error", f"All LLM providers failed. Last error on "
+                                             f"'{p.name}': {str(e)[:120]}")
+                    else:
+                        reason = "is out of quota / rate-limited" if _is_quota(status, body) \
+                            else f"failed ({status or 'error'})"
+                        self.notify("provider_switch",
+                                    f"'{p.name}' {reason}. Switched to '{nxt.name}'.")
                     break
-                reason = "is out of quota / rate-limited" if _is_quota(status, body) \
-                    else f"failed ({status or 'error'})"
-                self.notify("provider_switch", f"'{p.name}' {reason}. Switched to '{nxt.name}'.")
 
         raise AllProvidersFailed(str(last_err))
 
