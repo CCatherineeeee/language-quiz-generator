@@ -9,6 +9,7 @@ from .services.analysis import (
     check_ambiguity,
     check_input,
 )
+from .services.extraction import ExtractionResult, extract_knowledge
 
 app = FastAPI(title="Language Quiz Generator")
 
@@ -50,3 +51,14 @@ def input_check(req: InputCheckRequest) -> InputCheckResult:
 def input_ambiguity(req: InputCheckRequest) -> AmbiguityResult:
     _guard_length(req.text)
     return check_ambiguity(req.text)
+
+
+class ExtractionRequest(BaseModel):
+    text: str = Field(min_length=1)
+    resolved_meaning: str | None = None
+
+
+@app.post("/api/input/extract")
+def input_extract(req: ExtractionRequest) -> ExtractionResult:
+    _guard_length(req.text)
+    return extract_knowledge(req.text, resolved_meaning=req.resolved_meaning)

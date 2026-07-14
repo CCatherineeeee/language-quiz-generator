@@ -79,6 +79,23 @@ Iteration findings:
   JSON. With no fallback key configured this surfaces as AllProvidersFailed.
   Needs a client-level same-provider retry for transient generation failures.
 
+## EXTRACTION_SYSTEM_V1 (2026-07-14)
+
+Meta-extractor (pipeline stage 3): checked+disambiguated report -> storage-ready
+items (token/type/meaning_note/linguistic_metadata/parent_token) + max 5
+related-form suggestions for confirm-first. Metadata fields deliberately
+free-form per language (features.md: no hardcoded linguistic rules).
+
+Live probe (4 cases): items, parent links, resolved-sense passthrough, and
+per-language metadata all correct on the first draft. One quality iteration:
+verb suggestions jumped to the imperfect tense (twice — pronoun and bare form)
+before finishing the present. Added: exhaust same-tense persons first; a
+pronoun+bare pair is ONE suggestion. After: tu/il/nous present forms first,
+imparfait last, no duplicates.
+
+Code-side guard: suggestions duplicating an extracted item token are dropped
+deterministically. Goldens: evals/golden/extraction.jsonl.
+
 ## AMBIGUITY_SYSTEM_V1 (2026-07-12)
 
 Purpose: Analysis Layer stage 2 — detect when a reported language item has

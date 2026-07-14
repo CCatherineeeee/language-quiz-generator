@@ -78,7 +78,9 @@ works fine on Opus/Sonnet using these specs.
    gender-vs-accent fix — see prompt_devlog)
 5. ~~Judge rubric~~ (done: substitution + sense checks; known ceiling — same-tier
    judge misses subtle flaws, run offline judge on a stronger model)
-6. Meta-extractor prompt draft (also simply the next P0 slice)
+6. ~~Meta-extractor~~ (done 2026-07-14: EXTRACTION_SYSTEM_V1 + service +
+   /api/input/extract; one iteration on suggestion pedagogy — same-tense
+   persons first. Fable list complete.)
 
 Design decisions settled with these (2026-07-14): question_type mcq/translation
 (worker rule: repetition >= 2 -> translation, else mcq); MCQ grading is fully
