@@ -64,6 +64,79 @@ live LLM probe through Groq succeeds.
 8. **Gradio chat UI** mounted on FastAPI, wiring the pipeline end to end.
 9. Owner login (env-var secret cookie), then deploy (platform still TBD).
 
+## Fable-priority list (strong-model work, do before access ends)
+
+In value order. Items 1–2 are done (specs below). 3–6 are prompt/eval drafting —
+the most model-quality-dependent work. Everything else (building slices, grilling)
+works fine on Opus/Sonnet using these specs.
+
+1. ~~Worker spec~~ (below)
+2. ~~Storage transaction spec~~ (below)
+3. Draft quiz-generation prompt + its golden case list
+4. Draft grading prompt + golden cases (focus: false negatives — valid answers
+   marked wrong)
+5. Draft the judge rubric (1–5 scoring, G-Eval style) for both prompts
+6. Meta-extractor prompt draft (also simply the next P0 slice)
+
+## Spec: async quiz worker
+
+Settled by decision log #4 (Postgres queue, SKIP LOCKED). Micro-decisions below
+carry their reasons; build exactly this.
+
+- **Process model (debatable, recommendation):** v1 runs the worker as an
+  asyncio background task inside the FastAPI process — one deployable service,
+  one Railway bill, no IPC. Revisit to a separate process only if the worker
+  ever starves the web app. Veto point for Catherine.
+- **Schema additions (one Alembic migration):**
+  `quiz_generation_jobs.picked_up_at` (timestamp, nullable) and
+  `pending_quizzes.job_id` (FK, UNIQUE) — the unique key is what makes retries
+  idempotent.
+- **Loop, every ~3s:**
+  1. Reap: `UPDATE quiz_generation_jobs SET status='PENDING', attempts=attempts+1
+     WHERE status='PROCESSING' AND picked_up_at < now() - interval '2 minutes'`
+     (2 min ≈ 4× the slowest observed LLM call; too short double-generates,
+     too long delays recovery).
+  2. Dead-letter: `UPDATE ... SET status='FAILED' WHERE status='PENDING' AND
+     attempts >= 3` (3 tries: transient errors pass, poison jobs exit the loop).
+  3. Claim: `SELECT ... WHERE status='PENDING' ORDER BY created_at LIMIT 1
+     FOR UPDATE SKIP LOCKED`; set PROCESSING + picked_up_at=now(); **commit
+     before the LLM call** (never hold a transaction across a network call).
+  4. Generate via complete_structured (quiz schema TBD in slice 5).
+  5. On success, one transaction: UPSERT pending_quizzes keyed by job_id;
+     job status=DONE. On exception: attempts+1; status=PENDING if attempts<3
+     else FAILED; log the error.
+- **Lifecycle logs (structured JSON, one per transition):** JOB_ENQUEUED
+  (producer side), JOB_PICKED_UP, JOB_DONE, JOB_FAILED, JOB_REAPED — each with
+  job_id, user_id, event_type, latency_ms.
+- **Tests:** two concurrent claims never grab the same job; reaper resets a
+  stale PROCESSING job; attempts cap lands in FAILED; same job_id processed
+  twice yields one pending_quizzes row; happy path with FakeLLM.
+
+## Spec: storage transaction ("a new word is learned")
+
+Runs only after user confirmation (confirm-first). Input: user_id + list of
+confirmed items (token, type, language, meaning_note?, linguistic_metadata,
+parent_id?). "Both meanings" = two items in the list.
+
+One transaction, in order:
+
+1. Per item, find-or-create `global_dictionary` row. Match key:
+   (token, type, language, meaning_note) — meaning_note in the key is what
+   keeps "soirée/evening" and "soirée/party" as separate rows.
+2. Per created/found entity: insert `user_mastery_matrix` row **if absent**
+   (PK user_id+entity_id). Initial SM-2 state: interval_days=0, ease_factor=2.5,
+   repetition=0, next_review_date=now() (due immediately — a brand-new word
+   should be quizzed the same day). If the row already exists, skip it and
+   report "already tracked" back to the chat.
+3. One `quiz_generation_jobs` insert: event_type=NEW_ITEM_ADDED,
+   payload={"entity_ids": [all new ids]}, status=PENDING.
+4. Commit. Any failure rolls back everything — no word without its mastery
+   row, no mastery row without its quiz job.
+
+**Tests:** failure injected after step 1 leaves zero rows; both-meanings input
+creates 2 dictionary + 2 mastery rows + 1 job with both ids; re-adding a known
+word adds nothing and flags "already tracked"; job payload matches created ids.
+
 ## Deferred decisions
 
 - Hosting platform (requirement: always-on, no cold start).
