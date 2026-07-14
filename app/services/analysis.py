@@ -12,7 +12,7 @@ answer, never from the LLM guessing the most likely meaning.
 from pydantic import BaseModel, Field
 
 from app.llm.client import LLMClient
-from app.prompts import AMBIGUITY_SYSTEM_V1, INPUT_CHECK_SYSTEM_V2
+from app.prompts import AMBIGUITY_SYSTEM_V1, INPUT_CHECK_SYSTEM_V3
 
 
 class SpellingIssue(BaseModel):
@@ -74,7 +74,7 @@ def check_input(
 ) -> InputCheckResult:
     client = client or LLMClient()
     messages = [
-        {"role": "system", "content": INPUT_CHECK_SYSTEM_V2.format(language=language)},
+        {"role": "system", "content": INPUT_CHECK_SYSTEM_V3.format(language=language)},
         {"role": "user", "content": text},
     ]
     result = client.complete_structured(
@@ -86,4 +86,17 @@ def check_input(
     result.issues = [i for i in result.issues if i.original != i.corrected]
     if not result.issues and result.corrected_input == text:
         result.has_issues = False
+    # Observed failure mode (prompt_devlog: V3): bare "soireé" came back
+    # corrected but with has_issues=false and no issue entry. If the text
+    # changed, there IS an issue — enforce consistency deterministically.
+    if result.corrected_input.strip() != text.strip():
+        result.has_issues = True
+        if not result.issues:
+            result.issues = [
+                SpellingIssue(
+                    original=text.strip(),
+                    corrected=result.corrected_input.strip(),
+                    explanation="Spelling corrected.",
+                )
+            ]
     return result

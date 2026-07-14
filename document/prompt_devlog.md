@@ -48,6 +48,37 @@ prompt wording against this could regress other cases.
 All 4 probe cases (+ expected outputs) are seeded into the golden dataset:
 evals/golden/input_check.jsonl.
 
+## INPUT_CHECK_SYSTEM_V3 (2026-07-14) — first production-found bug
+
+A real user test on the Render deployment: bare input "dentifice" (misspelled
+dentifrice) returned has_issues=false. Reproduced locally — V2 missed it even
+inside a sentence. Root cause: V2 checks accents and grammar but never asks
+"does this word exist in {language}?".
+
+V3 changes: three explicit passes (word existence -> accents -> grammar),
+bare-word inputs named as a first-class input shape, dentifice worked example.
+
+Iteration findings:
+
+- dentifice fixed (bare + in sentence) on first V3 draft.
+- **New failure: V3 translated English.** "toothpaste" -> "dentifrice",
+  has_issues=true. Fix: "correcting means fixing spelling, NEVER translating;
+  return real English words unchanged."
+- **Inconsistent output on bare "soireé":** corrected_input was right but
+  has_issues=false with empty issues. Fixed in code, not prompt: if
+  corrected_input != input, has_issues is forced true and a generic issue is
+  synthesized. Deterministic consistency beats prompt pleading.
+- **Run-to-run variance measured:** the accent-in-english-frame golden passed,
+  failed, then passed again across identical temp-0 runs. Added a "work word
+  by word, never skip a word inside an English sentence" instruction; 3
+  consecutive full-suite passes after. Lesson for the eval suite: run goldens
+  N times and report pass rates, not single-run pass/fail.
+- **Known open issue (LLM client, not prompt):** Groq JSON mode intermittently
+  dies with "max completion tokens reached before generating a valid document"
+  (HTTP 400, json_validate_failed) — the model loops before emitting valid
+  JSON. With no fallback key configured this surfaces as AllProvidersFailed.
+  Needs a client-level same-provider retry for transient generation failures.
+
 ## AMBIGUITY_SYSTEM_V1 (2026-07-12)
 
 Purpose: Analysis Layer stage 2 — detect when a reported language item has

@@ -81,6 +81,18 @@ def test_noop_issues_are_filtered():
     assert result.has_issues is False
 
 
+def test_corrected_text_forces_has_issues():
+    # Observed live (prompt_devlog V3): bare "soireé" corrected but flagged
+    # has_issues=false with no issue entries.
+    fake = FakeLLM(
+        {"has_issues": False, "corrected_input": "soirée", "issues": []}
+    )
+    result = check_input("soireé", client=fake)
+    assert result.has_issues is True
+    assert result.issues[0].original == "soireé"
+    assert result.issues[0].corrected == "soirée"
+
+
 def test_endpoint_returns_check_result(monkeypatch):
     monkeypatch.setattr(
         analysis, "LLMClient", lambda *a, **k: FakeLLM(CORRECTION)
