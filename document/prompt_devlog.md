@@ -66,3 +66,54 @@ with fewer than 2 candidates can't be acted on, so check_ambiguity() coerces it
 to unambiguous. Not yet observed live; added defensively.
 
 Probe cases seeded into evals/golden/ambiguity.jsonl.
+
+## QUIZ_GENERATION_SYSTEM_V1 + JUDGE_QUIZ_SYSTEM_V1 (2026-07-14)
+
+Drafted together with the judged-retry loop (generate -> judge -> one retry
+with the judge's rationale when overall < 4; threshold starts at 4, sub-4
+quizzes logged as QUIZ_JUDGE_REJECTED for tuning). Two question formats in one
+prompt: mcq (4 choices) and translation (expected_answer).
+
+Live probe findings (3 payloads, Groq/llama-3.3-70b), three iterations:
+
+1. **Doubled article, judge blind to it.** "J'ai passé une très bonne ___" with
+   choice "la soirée" -> "une très bonne la soirée". Judge scored it 5/5.
+   Fix: substitution check in BOTH prompts (substitute each choice into the
+   blank; completed sentence must be grammatical).
+2. **Translation tested the wrong word.** user_note "mixes up with soir" seduced
+   the generator into expected_answer "le soir" — target token absent. Judge
+   caught this one (align=1); retry also failed. Fix: expected_answer MUST
+   contain the target item; user_note may shape context, never the answer.
+3. **Sense flip, judge blind again.** meaning_note "the evening (time span)"
+   produced a party-sense question; judge passed it 5/5. Fix: explicit
+   post-write sense verification in the generator + mandatory sense comparison
+   in the judge. Final probe: time-span sentence with the target token and a
+   party context kept as the trap ("La fête commencera dans la soirée").
+
+**Known ceiling:** a judge on the same free-tier model misses subtle flaws
+(sense mismatches, double-defensible tense choices in reported speech). The
+offline eval suite should run the judge on a stronger model tier than the
+generator. Interview line: "don't let the model grade its own homework at its
+own intelligence level."
+
+## GRADING_SYSTEM_V1 (2026-07-14)
+
+Deterministic paths first: MCQ grading never calls an LLM (stored explanation,
+correct=q4 recognition / wrong=q1); typed answers get an exact-match fast path
+(normalize case/whitespace/punctuation -> q5, zero cost). LLM grades only
+non-exact typed answers.
+
+Live probe (7 cases), one iteration:
+
+- PASS first try: fast paths, accent-only mistakes (correct, q4), futur proche
+  alternative accepted (the false-negative guard working).
+- **FAIL: "dans le soirée" forgiven as an accent issue** (correct, q4) — a
+  gender error, often the very thing being tested. Fix: prompt now defines
+  accent mistakes as diacritics-only and declares grammar mistakes never
+  forgivable, with an explicit article/agreement check step.
+- Minor: wrong word scored q2 with confused feedback; now capped at q0-1.
+- Accepted leniency: a semantically-shifted but defensible translation is
+  graded correct — chosen tradeoff, false negatives hurt more than false
+  positives here.
+
+Goldens: evals/golden/quiz_generation.jsonl, evals/golden/grading.jsonl.

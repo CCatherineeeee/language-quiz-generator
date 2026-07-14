@@ -2,20 +2,20 @@ This document is for documenting things I learnt, along with arguments and conce
 
 # Input analysis
 
-Input analysis is mainly done with 3 parts: prompts (tell llm look for ambiguity), schema (validates llm response JSON, which isn't guaranteed to be in right format always), function.
+Input analysis is mainly done with 3 parts: prompts (tell llm check spelling and gramma, look for ambiguity (soirée means night and party)), schema (validates llm response JSON, which isn't guaranteed to be in right format always), function (the service function the rest of the code calls).
 
 # Postgres for queue
 
 Postgres is chosed for holding queue for this app, as we don't expect to have too many event message for this app. It's unnessary and too expensive to configure another service (such as Redis, Kafka) for this app's queue.
-However, with a larger amount of event message data, we should consider
+However, with a larger amount of event message data, we should consider service like Redis or Kafka to be able to large amount of messages.
 
 # Why not docker
 
-Not necessary. We'll deploy this app on Railway and it doesn't need a docker file to deploy.
+No Dockerfile needed for deploy (buildpacks handle it).
 
 # Account Auth
 
-For this app, I'm mainly using it for two purpose right now: my personal language learning; job hunting project portfolio demo. Ask every recruitor or interviewer to create an account on this app is too much. Thus, it doesn't need a too complicated or secured authenticate system.
+For this app, I'm mainly using it for two purpose right now: my personal language learning; job hunting project portfolio demo. Ask every recruitor or interviewer to create an account on this app is too much. Thus, it doesn't need a too complicated or secured authenticate system to store accounts and passwords.
 
 # Why not Redis for the queue, if we use Redis anyway (for rate limiting)?
 

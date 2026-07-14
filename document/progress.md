@@ -72,11 +72,21 @@ works fine on Opus/Sonnet using these specs.
 
 1. ~~Worker spec~~ (below)
 2. ~~Storage transaction spec~~ (below)
-3. Draft quiz-generation prompt + its golden case list
-4. Draft grading prompt + golden cases (focus: false negatives — valid answers
-   marked wrong)
-5. Draft the judge rubric (1–5 scoring, G-Eval style) for both prompts
+3. ~~Quiz-generation prompt~~ (done 2026-07-14: mcq + translation formats,
+   judged-retry loop at threshold 4, 3 live iterations — see prompt_devlog)
+4. ~~Grading prompt~~ (done: deterministic fast paths, false-negative guard,
+   gender-vs-accent fix — see prompt_devlog)
+5. ~~Judge rubric~~ (done: substitution + sense checks; known ceiling — same-tier
+   judge misses subtle flaws, run offline judge on a stronger model)
 6. Meta-extractor prompt draft (also simply the next P0 slice)
+
+Design decisions settled with these (2026-07-14): question_type mcq/translation
+(worker rule: repetition >= 2 -> translation, else mcq); MCQ grading is fully
+deterministic (stored explanation, correct=q4/wrong=q1, "Correct!" shows no
+explanation); typed grading has an exact-match fast path; judge-retry capped at
+ONE with rationale as improvement hint; sub-threshold quizzes logged
+(QUIZ_JUDGE_REJECTED). P2 additions in features.md: "I guessed" honesty button,
+choice-specific wrong-answer analysis, knowledge-CRUD MCP tools.
 
 ## Spec: async quiz worker
 

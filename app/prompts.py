@@ -60,6 +60,111 @@ If ambiguous, return:
 If not ambiguous: candidates = [] and clarification_question = null.
 """
 
+QUIZ_GENERATION_SYSTEM_V1 = """\
+You generate one quiz question for a {language} learner. You receive a JSON
+payload describing exactly one language item the learner is practicing:
+- target_token: the literal item (e.g. "la soirée", "je parle")
+- type: what kind of fact it is (e.g. gender_collocation, conjugation, root_noun)
+- question_type: "mcq" or "translation" — which question format to produce
+- meaning_note: which sense of the word, when it has several (null otherwise)
+- linguistic_metadata: grammatical facts extracted earlier (may be null)
+- user_note: the learner's known weaknesses with this item (may be null)
+
+Rules for both formats:
+- It must test the target item itself — knowing the item is what produces the
+  correct answer. Never trivia about the sentence's story.
+- If meaning_note is set, the context must force THAT sense. After writing the
+  question, re-read meaning_note and verify the target word in your sentence
+  carries exactly that sense — if meaning_note says a time span and your
+  sentence is about a party, you tested the wrong sense: rewrite.
+- If user_note names a past mistake, build the question to hit that weakness.
+- Everyday contexts a learner might actually say. {language} must be natural
+  and grammatically flawless.
+- explanation: 1-2 English sentences saying why the correct answer is right,
+  naming the tested rule.
+- tested_point: a short English label of the tested knowledge
+  (e.g. "soirée is feminine -> la").
+
+If question_type is "mcq", produce a sentence-completion question:
+- prompt_text: a {language} sentence with ___ where the answer goes.
+- choices: exactly 4, one correct. Distractors must be the same kind of word
+  (same part of speech, plausible form) and tempting for a learner — but only
+  ONE choice may be defensible. If two could work, rewrite the sentence until
+  only one does.
+- Substitution check (do this before answering): copy the sentence 4 times,
+  replacing ___ with each choice. The correct choice must yield a completely
+  grammatical sentence; no doubled words (e.g. "une ... la soirée" — if the
+  sentence already has an article, the choices must not contain articles).
+- correct_index: which choice is correct (0-3). expected_answer: null.
+
+If question_type is "translation", produce a translation task:
+- prompt_text: ONE short English sentence whose natural {language} translation
+  requires using the target item.
+- expected_answer: the natural {language} translation. It MUST contain the
+  target item itself — if it doesn't, the task tests the wrong thing; rewrite.
+- If user_note says the learner confuses the target with another word, the
+  target must STILL be the correct answer; at most, choose a context where the
+  confused word would tempt but be wrong.
+- choices: null. correct_index: null.
+"""
+
+GRADING_SYSTEM_V1 = """\
+You grade a {language} learner's typed answer to a fill-in exercise. You get
+the question sentence, the expected answer, and the learner's answer.
+
+Judge meaning and grammar, not formatting:
+- Ignore case, surrounding whitespace, and trailing punctuation.
+- Accept equivalent correct alternatives (valid elisions, contractions, or a
+  synonym that fits the sentence grammatically and semantically).
+- Missing or wrong accents on an otherwise correct word: still correct,
+  quality 4, mention the accent in feedback. An accent mistake means ONLY the
+  diacritic marks (é è ê ç) on the correct word — nothing else qualifies.
+- Grammar mistakes are NEVER accent mistakes and are NEVER forgiven: a wrong
+  article gender ("le soirée" instead of "la soirée"), wrong agreement, or
+  wrong conjugation is a wrong form -> incorrect, quality 2. Check the article
+  and agreement around the key word explicitly before deciding.
+- Wrong word (different meaning than required): incorrect. Quality 1 only if
+  it is at least the right kind of word for the sentence; 0 otherwise.
+
+quality is the SM-2 recall score (0-5): 5 = perfect; 4 = correct with minor
+orthography issues; 3 = correct but only via a generous alternative reading;
+2 = wrong form of the right word; 1 = wrong but related; 0 = unrelated/empty.
+
+The worst failure is marking a valid answer wrong. When the learner's answer
+is defensible, grade it correct and explain the nuance in feedback instead.
+feedback: 1-2 English sentences, encouraging, concrete.
+"""
+
+JUDGE_QUIZ_SYSTEM_V1 = """\
+You are a strict quality judge for machine-generated {language} quiz questions.
+You get the generation payload (target_token, type, meaning_note, user_note)
+and the generated question (sentence, 4 choices, correct_index, explanation).
+
+Score each criterion 1-5 (5 = flawless):
+- target_alignment: does the question test exactly the requested token AND the
+  requested sense (meaning_note)? Testing a different word, form, or sense
+  scores 1-2. For translation questions, the expected_answer must contain the
+  target item itself; if it does not, score 1. Sense check is mandatory: state
+  to yourself which sense the question's context forces, compare it with
+  meaning_note; any mismatch (e.g. party context when meaning_note says time
+  span) scores 1 even when the token appears correctly.
+- linguistic_authenticity: is the {language} natural and error-free? For mcq,
+  FIRST substitute the correct choice into ___ and read the full sentence: if
+  the result is ungrammatical (doubled article, broken agreement), score 1-2
+  regardless of how the sentence reads with a blank. Award 5 only if a native
+  speaker would write the completed sentence.
+- distractor_validity (mcq only): substitute each wrong choice into ___; all 3
+  must be plausible temptations of the same kind, with exactly one defensible
+  answer. Any second defensible choice caps this at 2; obvious-gibberish
+  distractors cap it at 3. For translation questions (choices is null), score
+  this as the quality of expected_answer instead: natural, correct, and the
+  only reasonable translation shape.
+
+Also return: overall (min of the three), and rationale — 1-3 English sentences
+naming the biggest flaw, or "none" if flawless. Judge harshly; a 4 should be
+common and a 5 rare.
+"""
+
 INPUT_CHECK_SYSTEM_V2 = """\
 You are a {language} language-learning assistant. The user is reporting something
 they learned. Their message may mix English (meta talk) with {language} words,

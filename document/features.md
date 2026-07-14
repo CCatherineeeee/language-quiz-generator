@@ -63,6 +63,17 @@ Most app in market right now are just simple knowledge checking, such as anki, o
 1. Structured Outputs (JSON Schema / Tool Calling): the primary guarantee. By binding the API call to a strict JSON Schema, the LLM cannot return conversational fluff like "Sure, here is a quiz for you!". It can only emit valid JSON that matches your exact Pydantic schema, and anything that fails validation is rejected and retried.
 2. Low temperature (e.g. 0.0–0.2): reduces output variance so quiz formats stay consistent. Note: temperature 0 does NOT make inference deterministic — GPU batching and floating-point effects still produce run-to-run variation. Correctness comes from the schema constraint plus validation, never from temperature alone.
 
+# "I guessed" honesty button (P2)
+
+- On a correct MCQ answer, offer a small "I guessed" button next to "Correct!".
+- Tapping it: shows the stored explanation + tested_point (the learner didn't
+  actually know it), and records SM-2 quality 2 instead of 4, so the item comes
+  back soon instead of being pushed days out by a lucky guess.
+- Why: a lucky guess recorded as "known" is the quiet failure mode of every
+  MCQ-based spaced-repetition system; self-reporting is the cheapest fix.
+- No LLM call involved — explanation and tested_point were stored at
+  generation time.
+
 # Quiz collapse preprocessing (P2)
 
 - While looking at that raw list, collapse items are just different versions of the exact same verb (like je parle, tu parles, and nous parlons). Tell the AI: "Hey, these items are all variations of a verb (e.g. 'parler'). Write a single short paragraph story where the user has to fill in the blanks for all 3 variations at once."
@@ -72,6 +83,10 @@ Most app in market right now are just simple knowledge checking, such as anki, o
 - When quiz ended, should generate and user result. Update SM-2 data based on result
 
 # Quiz result analyze (P2)
+
+- Choice-specific wrong-answer analysis: send the user's actual wrong choice
+  (not just the correct answer) to the LLM — "explain why 'le' tempted them
+  here and why it's wrong" — instead of the generic stored explanation.
 
 - When quiz ended, should return problem and user result to chat interface, and redirect user back to chat interface. Indicating on interface that we are walkthough through problem evaluation in this interface
 - answers user questions on explaining gramma points ("Why did I use en instead of dans here?")

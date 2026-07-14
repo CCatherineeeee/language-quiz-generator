@@ -12,6 +12,8 @@ Resume portfolio project (targets: AI engineer and backend engineer roles). An L
 
 ## Working practices (every session)
 
+- **Pseudocode before code.** Before writing or editing implementation files, show the user a short outline / pseudocode of what will be built (schemas as field lists, functions as signatures + steps, prompts as intent bullets) and wait for agreement. Docs-only edits that record already-agreed decisions are exempt.
+
 - **Document settled debates.** Whenever a design question is debated and agreement is reached, record it in [document/design_choise.md](document/design_choise.md) in plain, easy language: what was decided, why, and the alternative that was rejected. That file is the user's interview-prep notes. Never rewrite or restyle entries the user wrote themselves — append, or suggest corrections in chat.
 - **Periodic grilling.** After each major completed slice, offer to run /grill-me so the user can practice defending the design and implementation under interview-style questioning before moving on.
 - **Grill-me style rules (user feedback 2026-07):** model answers must be straightforward, in easy plain concepts, and self-contained — pre-empt the follow-up questions instead of leaving jargon to be asked about. No long session conclusions or scorecards; end with a short encouragement or one-line performance note. Long wrap-ups waste tokens and don't get read.

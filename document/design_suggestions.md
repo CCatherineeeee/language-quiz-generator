@@ -46,3 +46,11 @@ v1 UI is Gradio, mounted inside the FastAPI app (`gr.mount_gradio_app`), centere
 ## Why
 
 The portfolio targets are AI engineer and backend engineer, so frontend polish buys little. Gradio gives a working chat UI in hours instead of weeks, is a recognized tool in AI engineering, and keeps the whole project in Python. A custom frontend (the quiz-card walkthrough prototype) stays on the P2 roadmap.
+
+# Cost optimization
+
+think about cost optimization
+Model-tier routing — extraction and classification steps don't need your primary model; route them to a cheaper tier. Often the single biggest cut.
+Prompt caching — your system prompt and tool definitions repeat every call; caching cuts input cost substantially on repeated prefixes.
+Output length control — cap max_tokens per tool; structured JSON outputs waste fewer tokens than prose.
+Judge sampling — running your 3-layer judge on every generation is expensive; sample a percentage once quality stabilizes, and keep 100% only for regression sets.
