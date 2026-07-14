@@ -80,6 +80,15 @@ Most app in market right now are just simple knowledge checking, such as anki, o
 - while explaning, point out the main testing knowledge point no matter if user get it correct or not, just to reinforce menory. If necessary, connect this knowledge point with some other related knowledge. 举一反三.
 - Good to have: a more interactive interface。prototype：每一个题目用卡片形式展现，要展示用户回答 or / and 正确答案,且可以让用户继续提问
 
+# Knowledge editing via MCP (P2)
+
+- Expose the user's saved knowledge as MCP tools — list / edit / split / delete items, adjust SM-2 state — so the chat LLM or any MCP client (e.g. Claude Desktop) can execute natural-language edits:
+  - "split 'evening party' into two meanings: 'evening' and 'party'"
+  - "I wasn't ready for soirée today — revert this practice and quiz me again tomorrow"
+- MCP tools are thin wrappers over the same service functions the API routes use (same rule as the Gradio UI: logic lives in services, clients stay thin).
+- "Revert practice" requires an undo log: store the pre-quiz SM-2 state next to each update.
+- Portfolio value: a working MCP server with real, stateful tools.
+
 # AI output Evaluation (P1)
 
 ## Eval Report as a Public Artifact (P1)
