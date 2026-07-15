@@ -73,6 +73,45 @@ Only two rows in v1: the owner account and the demo account (see design_suggesti
 
 How data should be crud in each scenarios
 
+### Full input-to-quiz flow (one diagram)
+
+```
+user types "I learned the word soirée"
+        |
+        v
+[0] API guardrail (no LLM): length check            [BUILT]
+        |--> too long? --> 413 error, stop
+        v
+[1] Spelling & grammar check (LLM, schema-validated) [BUILT, prompt V3]
+        |--> mistake found? --> show correction, user confirms corrected text
+        v
+[2] Ambiguity check (LLM, schema-validated)          [BUILT, prompt V1]
+        |--> ambiguous? --> STOP, ask user: "evening, party, or both?"
+        |                   --> user's answer resolves it (LLM never guesses)
+        v
+[3] Meta-extractor (LLM)                             [BUILT, prompt V1]
+        --> storage-ready items (token/type/sense/metadata/parent)
+        --> related-form suggestions ("also know the plural?")
+        v
+[4] Confirm-first: "Save soirée = 'evening party'?" --> user says yes
+        v
+[5] STORAGE TRANSACTION (one Postgres transaction,   [SPEC ONLY]
+    all-or-nothing — see spec in progress.md):
+        --> insert global_dictionary row(s)   (2 rows if both meanings)
+        --> insert user_mastery_matrix row(s) (SM-2 initial values)
+        --> insert quiz_generation_job        (eager generation)
+        v
+[6] Chat replies: "Saved! A quiz is being prepared."
+        |
+        v  (background worker, async)                [SPEC ONLY]
+[7] Worker claims job (SKIP LOCKED) --> generate_quiz_judged()
+    (generate -> judge -> <=1 retry)                 [SERVICES BUILT]
+        --> saves to pending_quizzes keyed by job_id
+        v
+[8] User takes quiz --> grading (MCQ: no LLM;        [SERVICES BUILT]
+    typed: fast path or LLM) --> SM-2 update         [SPEC ONLY]
+```
+
 ### A New Word is Learned
 
 When user say that they have learned a new word, the application should:
