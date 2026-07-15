@@ -63,6 +63,18 @@ Most app in market right now are just simple knowledge checking, such as anki, o
 1. Structured Outputs (JSON Schema / Tool Calling): the primary guarantee. By binding the API call to a strict JSON Schema, the LLM cannot return conversational fluff like "Sure, here is a quiz for you!". It can only emit valid JSON that matches your exact Pydantic schema, and anything that fails validation is rejected and retried.
 2. Low temperature (e.g. 0.0–0.2): reduces output variance so quiz formats stay consistent. Note: temperature 0 does NOT make inference deterministic — GPU batching and floating-point effects still produce run-to-run variation. Correctness comes from the schema constraint plus validation, never from temperature alone.
 
+# Quiz naturalness safeguards (P2)
+
+- "Report bad quiz" button: the owner is a real daily user — one tap on an
+  unnatural/confusing question saves it (with payload + judge scores) straight
+  into the golden dataset. Human feedback is the cheapest, most accurate QC.
+- Corpus-grounded generation: retrieve real sentences containing the target
+  item (open corpora, e.g. Tatoeba) and have the LLM adapt one instead of
+  inventing from scratch — adapted real sentences are far less likely to read
+  unnaturally than free-written ones.
+- Context: the judge's linguistic_authenticity criterion is the current
+  defense; same-tier model checking has a ceiling (see prompt_devlog).
+
 # "I guessed" honesty button (P2)
 
 - On a correct MCQ answer, offer a small "I guessed" button next to "Correct!".
