@@ -48,7 +48,29 @@ live LLM probe through Groq succeeds.
    - CLAUDE.md working practices added: document settled debates in
      design_choise.md; offer /grill-me after major slices
 
+5. Sessions of 2026-07-13/14/15:
+   - Quiz generation + grading + judge prompts: drafted, live-probed (3
+     iterations), judged-retry loop built, goldens seeded (`39d54e9`)
+   - INPUT_CHECK V3 after first production-found bug (bare "dentifice" on the
+     Render test deploy) (`05fc27a`)
+   - LLM client: one same-provider retry for transient failures (`cc87f6d`)
+   - Meta-extractor built: pipeline stages 1-3 all live (`a287611`)
+   - Flow diagram with build-status tags now in planning.md (`fc5d1c1`)
+   - Test deploy running on Render free tier (cold starts; fine for testing)
+   - Two grill rounds done; notes in interview_pitch_note.md (user-owned)
+
 ## Next up (P0 remaining, in build order)
+
+1. **Storage transaction** — spec in this file; first unbuilt step ([5] in
+   planning.md's flow diagram)
+2. **Queue worker** — spec in this file
+3. **SM-2 + update flow** — Catherine writes the SM-2 function herself
+   (interview prep decision); Claude reviews
+4. **Daily due sweep + demo-account nightly reset**
+5. **Gradio chat UI** wiring the pipeline end to end
+6. Owner login (env-var secret cookie), then always-on deploy (platform TBD)
+
+## Superseded (done, kept for history)
 
 1. **Linguistic meta-extractor**: extract `linguistic_metadata` JSON +
    related-form suggestions (conjugations, plural, gender).
