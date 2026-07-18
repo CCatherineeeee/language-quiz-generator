@@ -114,10 +114,23 @@ live LLM probe through Groq succeeds.
      mangé->manger, soirée), job 12 PENDING — the next deployed worker will
      generate the demo's first quiz; sweep verified to skip while it's open
 
+10. Gradio chat UI (2026-07-18):
+    - `app/ui.py`: chat_step() = the Learn-tab state machine as a plain
+      function (idle -> confirm_correction -> resolve_ambiguity ->
+      confirm_save), fully tested with scripted fakes; Gradio wiring thin
+    - Suggestions picked in chat via "yes+1,3"; Quiz tab fetches ALL
+      unanswered quizzes (decision), @gr.render builds rows dynamically
+      (no question cap — Gradio 6, `type=` kwarg gone from Chatbot)
+    - Mounted at "/" on FastAPI; API routes registered first still win
+    - Fix found by live boot: root logger defaults to WARNING, so job
+      lifecycle logs were invisible — basicConfig(INFO) in main.py
+    - 9 tests; 71 total pass, ruff clean. Live boot verified end to end:
+      lifespan started worker -> demo reset -> job processed -> 4-question
+      demo quiz now PENDING in Neon (left in place for the next deploy)
+
 ## Next up (P0 remaining, in build order)
 
-1. **Gradio chat UI** wiring the pipeline end to end
-2. Owner login (env-var secret cookie), then always-on deploy (platform TBD)
+1. Owner login (env-var secret cookie), then always-on deploy (platform TBD)
 
 ## Superseded (done, kept for history)
 

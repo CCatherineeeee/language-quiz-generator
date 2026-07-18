@@ -1,7 +1,9 @@
 import asyncio
 import contextlib
+import logging
 from contextlib import asynccontextmanager
 
+import gradio as gr
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -27,7 +29,12 @@ from .services.storage import (
     StorageResult,
     store_confirmed_items,
 )
+from .ui import build_ui
 from .worker import run_worker
+
+# Without this the job-lifecycle logs (app/joblog.py) are silently dropped:
+# Python's root logger defaults to WARNING and uvicorn only configures its own.
+logging.basicConfig(level=logging.INFO)
 
 
 @asynccontextmanager
@@ -124,3 +131,8 @@ def quiz_submit(quiz_id: int, req: SubmitRequest) -> SubmitResult:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except AnswerMismatchError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+# Mounted last, at the root: the API routes above are matched first, and
+# everything else (the recruiter-facing pages) goes to Gradio.
+app = gr.mount_gradio_app(app, build_ui(), path="/")
