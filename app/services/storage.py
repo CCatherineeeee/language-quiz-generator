@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.joblog import log_event
 from app.models import (
     GlobalDictionary,
     JobEventType,
@@ -149,6 +150,14 @@ def store_confirmed_items(
             session.flush()
             job_id = job.id
 
+    if job_id is not None:
+        log_event(
+            "JOB_ENQUEUED",
+            job_id=job_id,
+            user_id=user_id,
+            event_type=str(JobEventType.NEW_ITEM_ADDED),
+            entity_ids=new_entity_ids,
+        )
     return StorageResult(
         stored=stored, already_tracked=already_tracked, job_id=job_id
     )

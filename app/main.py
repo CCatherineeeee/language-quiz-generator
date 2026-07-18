@@ -1,3 +1,7 @@
+import asyncio
+import contextlib
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -16,8 +20,22 @@ from .services.storage import (
     StorageResult,
     store_confirmed_items,
 )
+from .worker import run_worker
 
-app = FastAPI(title="Language Quiz Generator")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # One-service decision (2026-07-18): the quiz worker runs as a background
+    # task inside this process. TestClient only triggers this when used as a
+    # context manager, so unit tests never start the loop.
+    worker_task = asyncio.create_task(run_worker())
+    yield
+    worker_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await worker_task
+
+
+app = FastAPI(title="Language Quiz Generator", lifespan=lifespan)
 
 # Infra-level guardrail (features.md: never let the LLM see an oversized request).
 MAX_INPUT_CHARS = 2000

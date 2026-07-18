@@ -74,14 +74,28 @@ live LLM probe through Groq succeeds.
      extraction"): cache-aside lookup before the extraction LLM call; compare
      token spend v1 vs v2 when it lands
 
+7. Queue worker (2026-07-18):
+   - `app/worker.py`: tick = reap stale (2 min) -> bury at 3 attempts ->
+     claim with FOR UPDATE SKIP LOCKED (commit before LLM) -> generate via
+     generate_quiz_judged -> upsert pending_quizzes keyed by UNIQUE job_id
+   - Runs in-process: asyncio task from FastAPI lifespan, tick in a thread
+     (decision: Render free tier has no free worker service type)
+   - Migration `6003bece63a7`: jobs.picked_up_at + pending_quizzes.job_id
+     (UNIQUE) — constraint names hand-fixed (autogen left them None)
+   - JSON lifecycle logs in `app/joblog.py` (JOB_ENQUEUED..JOB_REAPED)
+   - question_type rule live: repetition >= 2 -> translation, else mcq
+   - 7 worker tests on SQLite; SKIP LOCKED concurrency test runs on real
+     Neon (SQLite ignores the clause); 47 total pass, ruff clean
+   - Live end-to-end probe: store -> enqueue -> tick -> judged quiz row
+     (first attempt judge-rejected, retry kept at overall 4); cleaned up
+
 ## Next up (P0 remaining, in build order)
 
-1. **Queue worker** — spec in this file
-2. **SM-2 + update flow** — Catherine writes the SM-2 function herself
+1. **SM-2 + update flow** — Catherine writes the SM-2 function herself
    (interview prep decision); Claude reviews
-3. **Daily due sweep + demo-account nightly reset**
-4. **Gradio chat UI** wiring the pipeline end to end
-5. Owner login (env-var secret cookie), then always-on deploy (platform TBD)
+2. **Daily due sweep + demo-account nightly reset**
+3. **Gradio chat UI** wiring the pipeline end to end
+4. Owner login (env-var secret cookie), then always-on deploy (platform TBD)
 
 ## Superseded (done, kept for history)
 

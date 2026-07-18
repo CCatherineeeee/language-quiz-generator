@@ -52,3 +52,13 @@ Rejected alternative: pre-building the whole dictionary with a cron job so paren
 v1 ships as-is: the extractor calls the LLM for metadata on every message, and the storage transaction populates global_dictionary. v2 (features.md P2 "dictionary-aware extraction", my design): before the LLM call, look each reported token up in global_dictionary — on a hit, reuse the stored metadata and meaning_notes (prompting "if the user means one of these, reuse its exact meaning_note"), on a miss, generate once and store. This is the cache-aside pattern: check the store first, only call the expensive thing on a miss, write the result back.
 
 Plan: land v2 after the core loop works, then compare LLM calls and output tokens per stored word before vs after. Interview story: shipped the simple version first, then measured my optimization instead of assuming it helps.
+
+# Worker runs inside the FastAPI process, not as a separate service
+
+(agreed 2026-07-18)
+
+The quiz worker is a background loop that starts when the web app starts (an asyncio task), instead of a second deployed service. Reasons: one thing to deploy and monitor; at our load (a handful of jobs a day) the worker can't starve the web app; and the deciding fact — on Render's free plan, web services are free but the "Background Worker" service type has no free tier ($7/month minimum). So the two-service design is the only one that costs money.
+
+Caveat we accepted: on the free plan the web service spins down when idle, and the in-process worker sleeps with it. Fine for now, because jobs are created exactly when I'm using the app (so it's awake). The nightly due-sweep is what truly needs an always-on machine — that's the still-open hosting decision.
+
+The worker claims jobs with FOR UPDATE SKIP LOCKED (Postgres: "lock the row you pick; if a row is already locked by someone else, skip it instead of waiting") — so even if two workers ever run, they can't grab the same job. And pending_quizzes.job_id is UNIQUE, so a retried job overwrites its own quiz instead of creating a duplicate. Interview line: idempotency here is enforced by the database schema, not by careful code.

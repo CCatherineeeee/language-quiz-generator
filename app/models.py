@@ -71,6 +71,10 @@ class PendingQuiz(Base):
     )
     # The global_dictionary ids this quiz tests — how grading maps back to SM-2 rows.
     entity_ids: Mapped[list] = mapped_column(JSON)
+    # UNIQUE: a retried job overwrites its own quiz instead of duplicating it.
+    job_id: Mapped[int | None] = mapped_column(
+        ForeignKey("quiz_generation_jobs.id"), unique=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -105,6 +109,8 @@ class QuizGenerationJob(Base):
         Enum(JobStatus, native_enum=False, length=20), default=JobStatus.PENDING
     )
     attempts: Mapped[int] = mapped_column(default=0)
+    # Set when a worker claims the job; the reaper uses it to spot stale claims.
+    picked_up_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
