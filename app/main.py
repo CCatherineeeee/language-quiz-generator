@@ -14,6 +14,13 @@ from .services.analysis import (
     check_input,
 )
 from .services.extraction import ExtractionResult, extract_knowledge
+from .services.review import (
+    AnswerMismatchError,
+    QuizAlreadyCompletedError,
+    SubmitResult,
+    SubmittedAnswer,
+    submit_quiz,
+)
 from .services.storage import (
     ConfirmedItem,
     DanglingParentError,
@@ -99,4 +106,21 @@ def knowledge_store(req: StoreRequest) -> StorageResult:
         try:
             return store_confirmed_items(session, req.user_id, req.items)
         except DanglingParentError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class SubmitRequest(BaseModel):
+    answers: list[SubmittedAnswer] = Field(min_length=1)
+
+
+@app.post("/api/quiz/{quiz_id}/submit")
+def quiz_submit(quiz_id: int, req: SubmitRequest) -> SubmitResult:
+    with SessionLocal() as session:
+        try:
+            return submit_quiz(session, quiz_id, req.answers)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except QuizAlreadyCompletedError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except AnswerMismatchError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc

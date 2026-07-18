@@ -62,3 +62,15 @@ The quiz worker is a background loop that starts when the web app starts (an asy
 Caveat we accepted: on the free plan the web service spins down when idle, and the in-process worker sleeps with it. Fine for now, because jobs are created exactly when I'm using the app (so it's awake). The nightly due-sweep is what truly needs an always-on machine — that's the still-open hosting decision.
 
 The worker claims jobs with FOR UPDATE SKIP LOCKED (Postgres: "lock the row you pick; if a row is already locked by someone else, skip it instead of waiting") — so even if two workers ever run, they can't grab the same job. And pending_quizzes.job_id is UNIQUE, so a retried job overwrites its own quiz instead of creating a duplicate. Interview line: idempotency here is enforced by the database schema, not by careful code.
+
+# SM-2 as a pure function, and the two-phase quiz submit
+
+(agreed 2026-07-18)
+
+SM-2 is implemented as the published algorithm, unmodified, in one pure function: sm2_next(interval, ease_factor, repetition, quality) -> new state. "Pure" means it touches no database and no clock (the caller passes now), so the same inputs always give the same outputs — which makes it fully unit-testable against the known SM-2 sequence (intervals 1, 6, then interval x ease factor), and swappable: upgrading to a better scheduler like FSRS later means replacing this one function.
+
+The submit flow (grade answers, update SM-2, mark quiz completed) runs in two phases on purpose:
+1. Read the quiz and close the transaction. Grading a typed answer may call the LLM, and a database transaction must never stay open across a slow network call (it would hold locks and a connection for seconds).
+2. One write transaction that re-checks "already completed?" while holding a row lock, then applies all the SM-2 updates and flips the quiz to COMPLETED together.
+
+Why the re-check with a lock: if the user double-clicks submit, two requests race. Both may pass the first check, but the row lock forces them through the write phase one at a time — the second sees COMPLETED and gets rejected (HTTP 409). Without this, one quiz could advance a word's schedule twice. This is the idempotency pillar: retries and double-clicks must never duplicate a side effect.

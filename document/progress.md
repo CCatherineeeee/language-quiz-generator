@@ -89,13 +89,24 @@ live LLM probe through Groq succeeds.
    - Live end-to-end probe: store -> enqueue -> tick -> judged quiz row
      (first attempt judge-rejected, retry kept at overall 4); cleaned up
 
+8. SM-2 + submit flow (2026-07-18):
+   - `app/services/scheduler.py`: textbook SM-2 as a pure function
+     (`sm2_next`) + `apply_review` bridge; swap-point for FSRS later
+   - `app/services/review.py`: `submit_quiz` — read+check, grade with NO
+     transaction open (LLM may be called), then one write txn with a
+     FOR UPDATE re-check so a double-submit can't advance SM-2 twice (409)
+   - `POST /api/quiz/{id}/submit`; 9 tests (canonical SM-2 sequence, EF
+     floor, fast-path proof, double-submit); 56 total pass, ruff clean
+   - Full-loop live probe on Neon: store -> tick -> submit correct answer ->
+     rep 1 / due tomorrow / EF 2.5 (q=4 leaves EF unchanged) -> COMPLETED
+   - Plan change: Catherine opted for Claude writing SM-2; interview prep
+     moves to a /grill-me round on the algorithm instead
+
 ## Next up (P0 remaining, in build order)
 
-1. **SM-2 + update flow** — Catherine writes the SM-2 function herself
-   (interview prep decision); Claude reviews
-2. **Daily due sweep + demo-account nightly reset**
-3. **Gradio chat UI** wiring the pipeline end to end
-4. Owner login (env-var secret cookie), then always-on deploy (platform TBD)
+1. **Daily due sweep + demo-account nightly reset**
+2. **Gradio chat UI** wiring the pipeline end to end
+3. Owner login (env-var secret cookie), then always-on deploy (platform TBD)
 
 ## Superseded (done, kept for history)
 
