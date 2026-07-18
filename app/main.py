@@ -5,9 +5,11 @@ from contextlib import asynccontextmanager
 
 import gradio as gr
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
+from . import auth
 from .db import SessionLocal, engine
 from .services.analysis import (
     AmbiguityResult,
@@ -53,6 +55,29 @@ app = FastAPI(title="Language Quiz Generator", lifespan=lifespan)
 
 # Infra-level guardrail (features.md: never let the LLM see an oversized request).
 MAX_INPUT_CHARS = 2000
+
+
+@app.get("/login")
+def login(key: str):
+    """Owner-only entrance: /login?key=<OWNER_SECRET> (see app/auth.py)."""
+    if not auth.login_key_valid(key):
+        raise HTTPException(status_code=403, detail="wrong key")
+    resp = RedirectResponse("/", status_code=303)
+    resp.set_cookie(
+        auth.COOKIE_NAME,
+        auth.owner_cookie_value(),
+        max_age=auth.COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+    )
+    return resp
+
+
+@app.get("/logout")
+def logout():
+    resp = RedirectResponse("/", status_code=303)
+    resp.delete_cookie(auth.COOKIE_NAME)
+    return resp
 
 
 @app.get("/health")

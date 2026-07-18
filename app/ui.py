@@ -16,6 +16,7 @@ from dataclasses import dataclass
 import gradio as gr
 from sqlalchemy import select
 
+from app.auth import COOKIE_NAME, OWNER_USER_ID, resolve_user_id
 from app.db import SessionLocal
 from app.models import PendingQuiz, QuizStatus
 from app.services.analysis import check_ambiguity, check_input
@@ -23,7 +24,11 @@ from app.services.extraction import ExtractionResult, extract_knowledge
 from app.services.review import SubmittedAnswer, submit_quiz
 from app.services.storage import ConfirmedItem, DanglingParentError, store_confirmed_items
 
-USERS = {"Catherine": 1, "Demo": 2}
+
+def _user_from_request(request: gr.Request | None) -> int:
+    """Demo by default; the owner is recognized by the signed /login cookie."""
+    cookies = getattr(request, "cookies", None) or {}
+    return resolve_user_id(cookies.get(COOKIE_NAME))
 
 
 # ---------------------------------------------------------------- Learn tab
@@ -247,9 +252,14 @@ def _submit_one_quiz(quiz: dict, values: list, session_factory=SessionLocal) -> 
 def build_ui() -> gr.Blocks:
     with gr.Blocks(title="Language Quiz Generator") as demo:
         gr.Markdown("# Language Quiz Generator")
-        user_dd = gr.Dropdown(
-            choices=list(USERS), value="Catherine", label="Account"
-        )
+        account_md = gr.Markdown()
+
+        def show_account(request: gr.Request):
+            if _user_from_request(request) == OWNER_USER_ID:
+                return "**Account:** Catherine (owner)"
+            return "**Account:** Demo — resets nightly, feel free to play!"
+
+        demo.load(show_account, outputs=[account_md])
 
         with gr.Tab("Learn"):
             chatbot = gr.Chatbot(height=420)
@@ -258,9 +268,9 @@ def build_ui() -> gr.Blocks:
             )
             chat_state = gr.State({})
 
-            def on_message(message, history, state, user_name):
+            def on_message(message, history, state, request: gr.Request):
                 deps = ChatDeps()
-                reply = chat_step(message, state, USERS[user_name], deps)
+                reply = chat_step(message, state, _user_from_request(request), deps)
                 history = history + [
                     {"role": "user", "content": message},
                     {"role": "assistant", "content": reply},
@@ -269,7 +279,7 @@ def build_ui() -> gr.Blocks:
 
             msg_box.submit(
                 on_message,
-                inputs=[msg_box, chatbot, chat_state, user_dd],
+                inputs=[msg_box, chatbot, chat_state],
                 outputs=[chatbot, chat_state, msg_box],
             )
 
@@ -277,10 +287,10 @@ def build_ui() -> gr.Blocks:
             fetch_btn = gr.Button("Get my quizzes")
             quizzes_state = gr.State([])
 
-            def on_fetch(user_name):
-                return fetch_open_quizzes(USERS[user_name])
+            def on_fetch(request: gr.Request):
+                return fetch_open_quizzes(_user_from_request(request))
 
-            fetch_btn.click(on_fetch, inputs=[user_dd], outputs=[quizzes_state])
+            fetch_btn.click(on_fetch, inputs=[], outputs=[quizzes_state])
 
             @gr.render(inputs=quizzes_state)
             def render_quizzes(quizzes):

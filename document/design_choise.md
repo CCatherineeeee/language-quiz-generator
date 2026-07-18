@@ -63,6 +63,18 @@ Caveat we accepted: on the free plan the web service spins down when idle, and t
 
 The worker claims jobs with FOR UPDATE SKIP LOCKED (Postgres: "lock the row you pick; if a row is already locked by someone else, skip it instead of waiting") — so even if two workers ever run, they can't grab the same job. And pending_quizzes.job_id is UNIQUE, so a retried job overwrites its own quiz instead of creating a duplicate. Interview line: idempotency here is enforced by the database schema, not by careful code.
 
+# Owner login: one secret URL, a signed cookie, demo by default
+
+(agreed 2026-07-18, implements decision log #5)
+
+Every visitor IS the demo account — recruiters never sign up, they just play. I alone log in by visiting /login?key=MY_SECRET once. That sets a cookie whose value is an HMAC signature: a hash computed WITH the secret as the key, so nobody can forge the cookie without knowing the secret, and the server verifies it by simply recomputing the hash — no session table, no user database, no passwords to store or leak.
+
+Two safety details worth mentioning in interviews:
+1. If the OWNER_SECRET env var is missing (left at the placeholder), login is disabled entirely — a deploy that forgot the env var must not end up with a guessable owner key.
+2. Comparisons use hmac.compare_digest, which takes the same time whether the guess is close or completely wrong (a normal == returns early at the first wrong character, and that timing difference is measurable — a "timing attack").
+
+Rejected alternative: real accounts with passwords. For a portfolio app with exactly one real user, storing passwords adds risk and signup friction with zero benefit.
+
 # SM-2 as a pure function, and the two-phase quiz submit
 
 (agreed 2026-07-18)

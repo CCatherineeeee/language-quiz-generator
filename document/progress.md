@@ -128,9 +128,22 @@ live LLM probe through Groq succeeds.
       lifespan started worker -> demo reset -> job processed -> 4-question
       demo quiz now PENDING in Neon (left in place for the next deploy)
 
-## Next up (P0 remaining, in build order)
+11. Owner login (2026-07-18):
+    - `app/auth.py`: /login?key=OWNER_SECRET sets an HMAC-signed cookie;
+      /logout clears; every visitor without the cookie IS the Demo user
+      (account dropdown removed — visitors can no longer impersonate owner)
+    - Placeholder-secret guard: unset OWNER_SECRET disables login entirely
+    - OWNER_SECRET not yet in local .env (login disabled until Catherine
+      adds it); must also be set on the deploy platform
+    - 6 tests; 77 total pass, ruff clean. ALL P0 CODE COMPLETE.
 
-1. Owner login (env-var secret cookie), then always-on deploy (platform TBD)
+## Next up
+
+1. **Always-on deploy** — the last P0; blocked on the hosting decision
+   (requirement: no cold start, so the nightly sweep/reset actually run).
+   Set OWNER_SECRET + DATABASE_URL + LLM keys on the platform.
+2. Grill rounds on the 5 ungrilled slices (storage, worker, SM-2, sweep,
+   UI/auth), then P1/P2 (evals dashboard, cache-aside extractor v2, MCP).
 
 ## Superseded (done, kept for history)
 
