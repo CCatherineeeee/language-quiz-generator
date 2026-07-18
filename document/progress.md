@@ -102,11 +102,22 @@ live LLM probe through Groq succeeds.
    - Plan change: Catherine opted for Claude writing SM-2; interview prep
      moves to a /grill-me round on the algorithm instead
 
+9. Due sweep + demo reset (2026-07-18):
+   - `app/services/sweep.py`: sweep_due_items (USER_ITEMS_DUE producer,
+     capped at 10 longest-overdue, open-work guard makes it idempotent) +
+     reset_demo_accounts (wipes is_demo users' rows, re-seeds via the normal
+     storage transaction — shared global_dictionary rows never deleted)
+   - Worker loop now has 3 duties: tick every 3s, sweep hourly + at boot,
+     reset on UTC date change + at boot (cold start = fresh demo, on purpose)
+   - 6 tests; 62 total pass, ruff clean
+   - Live-run on Neon and LEFT IN PLACE: demo user seeded (bonjour, manger,
+     mangé->manger, soirée), job 12 PENDING — the next deployed worker will
+     generate the demo's first quiz; sweep verified to skip while it's open
+
 ## Next up (P0 remaining, in build order)
 
-1. **Daily due sweep + demo-account nightly reset**
-2. **Gradio chat UI** wiring the pipeline end to end
-3. Owner login (env-var secret cookie), then always-on deploy (platform TBD)
+1. **Gradio chat UI** wiring the pipeline end to end
+2. Owner login (env-var secret cookie), then always-on deploy (platform TBD)
 
 ## Superseded (done, kept for history)
 

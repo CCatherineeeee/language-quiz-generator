@@ -42,10 +42,14 @@ from app.models import (
     UserMasteryMatrix,
 )
 from app.services.generation import QuizPayload, generate_quiz_judged
+from app.services.sweep import reset_demo_accounts, sweep_due_items
 
 logger = logging.getLogger(__name__)
 
 TICK_SECONDS = 3
+# The sweep is idempotent (open-work guard), so an hourly cadence is about
+# freshness, not correctness — and it also runs right after every cold start.
+SWEEP_INTERVAL_SECONDS = 3600
 # ~4x the slowest observed LLM call: shorter risks double-generating a slow
 # job, longer just delays recovery after a crash.
 STALE_AFTER = timedelta(minutes=2)
@@ -234,14 +238,30 @@ def tick(
 async def run_worker() -> None:
     """The forever-loop FastAPI starts at boot (see lifespan in main.py).
 
-    tick() is sync (SQLAlchemy + LLM client), so it runs in a thread — the
-    web app's event loop is never blocked. A crashing tick is logged and the
-    loop keeps going; the job it was holding gets reaped two minutes later.
+    Three duties on one loop:
+    - every tick (~3s): process one queued quiz job
+    - hourly + at boot: sweep_due_items (enqueue due-review quizzes)
+    - on UTC date change + at boot: reset_demo_accounts (recruiters always
+      find a fresh demo; a cold start counts as "a new day" on purpose)
+
+    All of it is sync (SQLAlchemy + LLM client), so each duty runs in a
+    thread — the web app's event loop is never blocked. A crashing pass is
+    logged and the loop keeps going; a job it was holding gets reaped two
+    minutes later.
     """
     log_event("WORKER_STARTED", tick_seconds=TICK_SECONDS)
+    last_sweep: float | None = None
+    last_reset_date = None
     while True:
         try:
+            today = datetime.now(UTC).date()
+            if last_reset_date != today:
+                await asyncio.to_thread(reset_demo_accounts)
+                last_reset_date = today
+            if last_sweep is None or time.monotonic() - last_sweep >= SWEEP_INTERVAL_SECONDS:
+                await asyncio.to_thread(sweep_due_items)
+                last_sweep = time.monotonic()
             await asyncio.to_thread(tick)
         except Exception:
-            logger.exception("worker tick crashed")
+            logger.exception("worker pass crashed")
         await asyncio.sleep(TICK_SECONDS)
