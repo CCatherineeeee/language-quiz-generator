@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from .db import engine
+from .db import SessionLocal, engine
 from .services.analysis import (
     AmbiguityResult,
     InputCheckResult,
@@ -10,6 +10,12 @@ from .services.analysis import (
     check_input,
 )
 from .services.extraction import ExtractionResult, extract_knowledge
+from .services.storage import (
+    ConfirmedItem,
+    DanglingParentError,
+    StorageResult,
+    store_confirmed_items,
+)
 
 app = FastAPI(title="Language Quiz Generator")
 
@@ -62,3 +68,17 @@ class ExtractionRequest(BaseModel):
 def input_extract(req: ExtractionRequest) -> ExtractionResult:
     _guard_length(req.text)
     return extract_knowledge(req.text, resolved_meaning=req.resolved_meaning)
+
+
+class StoreRequest(BaseModel):
+    user_id: int
+    items: list[ConfirmedItem] = Field(min_length=1)
+
+
+@app.post("/api/knowledge/store")
+def knowledge_store(req: StoreRequest) -> StorageResult:
+    with SessionLocal() as session:
+        try:
+            return store_confirmed_items(session, req.user_id, req.items)
+        except DanglingParentError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc

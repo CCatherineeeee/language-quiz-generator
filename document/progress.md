@@ -59,16 +59,29 @@ live LLM probe through Groq succeeds.
    - Test deploy running on Render free tier (cold starts; fine for testing)
    - Two grill rounds done; notes in interview_pitch_note.md (user-owned)
 
+6. Storage transaction (2026-07-18):
+   - `store_confirmed_items()` in `app/services/storage.py` +
+     `POST /api/knowledge/store`; built exactly to the spec below
+   - Parent links: parentless items insert first; a child's parent_token
+     resolves against the batch first, then global_dictionary; no match →
+     DanglingParentError, whole batch rolls back (422 at the API)
+   - 8 tests on in-memory SQLite (StaticPool); 40 total pass, ruff clean
+   - Live-probed against Neon (vérifier/vérifié, Demo user): parent link,
+     SM-2 init, and job payload all correct; probe rows cleaned up after
+   - Note for callers: the service opens its own transaction — call it on a
+     session with no transaction in progress (rollback/commit any prior reads)
+   - v2 planned (Catherine's design, features.md P2 "dictionary-aware
+     extraction"): cache-aside lookup before the extraction LLM call; compare
+     token spend v1 vs v2 when it lands
+
 ## Next up (P0 remaining, in build order)
 
-1. **Storage transaction** — spec in this file; first unbuilt step ([5] in
-   planning.md's flow diagram)
-2. **Queue worker** — spec in this file
-3. **SM-2 + update flow** — Catherine writes the SM-2 function herself
+1. **Queue worker** — spec in this file
+2. **SM-2 + update flow** — Catherine writes the SM-2 function herself
    (interview prep decision); Claude reviews
-4. **Daily due sweep + demo-account nightly reset**
-5. **Gradio chat UI** wiring the pipeline end to end
-6. Owner login (env-var secret cookie), then always-on deploy (platform TBD)
+3. **Daily due sweep + demo-account nightly reset**
+4. **Gradio chat UI** wiring the pipeline end to end
+5. Owner login (env-var secret cookie), then always-on deploy (platform TBD)
 
 ## Superseded (done, kept for history)
 

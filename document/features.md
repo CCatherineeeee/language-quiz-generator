@@ -90,6 +90,31 @@ Most app in market right now are just simple knowledge checking, such as anki, o
 
 - While looking at that raw list, collapse items are just different versions of the exact same verb (like je parle, tu parles, and nous parlons). Tell the AI: "Hey, these items are all variations of a verb (e.g. 'parler'). Write a single short paragraph story where the user has to fill in the blanks for all 3 variations at once."
 
+# Dictionary-aware extraction (P2) — cache-aside rewrite of stage 3
+
+- Rewrite the extractor as cache-aside: for each token the user reports,
+  look it up in `global_dictionary` first. Hit → reuse the stored
+  `linguistic_metadata`, meaning_notes, and parent links; no LLM metadata
+  generation. Miss → LLM generates metadata + related forms once, storage
+  writes them back, and every later user gets the cached version.
+- On a hit with existing senses, feed them to the LLM/user with "if the user
+  means one of these, reuse its exact meaning_note" — this also fixes the
+  meaning_note drift bug (LLM saying "night" when the stored key says
+  "evening" would otherwise create a duplicate row).
+- Why: metadata is user-independent. If 10 users learn "cours" the same day,
+  today's flow extracts its metadata 10 times and storage discards 9 copies.
+  Cache-aside saves those tokens and keeps metadata consistent.
+- Note: for full-sentence input the LLM still reads the message once to
+  identify which tokens are being reported; the skip applies to metadata
+  generation per known token.
+- Bonus: the same lookup can surface already-linked forms in chat ("you know
+  manger; mangé is its past participle").
+- Optional later: pre-seed common A1–B2 French words with a one-off script.
+  Never load-bearing — the on-demand path must stay as the fallback for
+  anything outside the seed set (other languages, slang, phrases).
+- Depends on the dictionary being populated, so it comes after the storage
+  transaction ships.
+
 # SM-2 update (P0)
 
 - When quiz ended, should generate and user result. Update SM-2 data based on result
