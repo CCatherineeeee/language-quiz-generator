@@ -18,10 +18,14 @@ from sqlalchemy import select
 
 from app.auth import COOKIE_NAME, OWNER_USER_ID, resolve_user_id
 from app.db import SessionLocal
-from app.models import PendingQuiz, QuizStatus
+from app.models import GlobalDictionary, PendingQuiz, QuizStatus, UserMasteryMatrix
 from app.services.analysis import check_ambiguity, check_input
 from app.services.extraction import ExtractionResult, extract_knowledge
-from app.services.review import SubmittedAnswer, submit_quiz
+from app.services.review import (
+    QuizAlreadyCompletedError,
+    SubmittedAnswer,
+    submit_quiz,
+)
 from app.services.storage import ConfirmedItem, DanglingParentError, store_confirmed_items
 
 
@@ -229,22 +233,80 @@ def answers_from_values(questions: list[dict], values: list) -> list[SubmittedAn
     return answers
 
 
-def _submit_one_quiz(quiz: dict, values: list, session_factory=SessionLocal) -> str:
-    try:
-        answers = answers_from_values(quiz["questions"], list(values))
-    except ValueError as exc:
-        return str(exc)
+def open_quiz_ids(user_id: int, session_factory=SessionLocal) -> set[int]:
     with session_factory() as session:
-        result = submit_quiz(session, quiz["quiz_id"], answers)
-    lines = []
-    for out in result.outcomes:
-        mark = "✅" if out.is_correct else "❌"
-        lines.append(
-            f"{mark} {out.feedback}  \n"
-            f"→ next review in {out.interval_days} day(s) "
-            f"({out.next_review_date.date()})"
+        return set(
+            session.scalars(
+                select(PendingQuiz.id).where(
+                    PendingQuiz.user_id == user_id,
+                    PendingQuiz.status == QuizStatus.PENDING,
+                )
+            ).all()
         )
+
+
+def submit_all_quizzes(
+    quizzes: list[dict], values: list, session_factory=SessionLocal
+) -> str:
+    """One combined submit: values are all questions' answers in display
+    order; behind the scenes each underlying quiz is submitted separately."""
+    values = list(values)
+    per_quiz_answers, offset = [], 0
+    for quiz in quizzes:
+        n = len(quiz["questions"])
+        try:
+            per_quiz_answers.append(
+                answers_from_values(quiz["questions"], values[offset : offset + n])
+            )
+        except ValueError as exc:
+            return str(exc)  # nothing graded until every question is answered
+        offset += n
+
+    lines, number = [], 1
+    for quiz, answers in zip(quizzes, per_quiz_answers, strict=True):
+        try:
+            with session_factory() as session:
+                result = submit_quiz(session, quiz["quiz_id"], answers)
+        except QuizAlreadyCompletedError:
+            for _ in quiz["questions"]:
+                lines.append(f"{number}. (was already submitted earlier)")
+                number += 1
+            continue
+        for out in result.outcomes:
+            mark = "✅" if out.is_correct else "❌"
+            lines.append(
+                f"{number}. {mark} {out.feedback}  \n"
+                f"→ next review in {out.interval_days} day(s) "
+                f"({out.next_review_date.date()})"
+            )
+            number += 1
     return "\n\n".join(lines)
+
+
+# ------------------------------------------------------------- My words tab
+
+def fetch_saved_words(user_id: int, session_factory=SessionLocal) -> list[list]:
+    """The user's mastery matrix, soonest review first."""
+    with session_factory() as session:
+        rows = session.execute(
+            select(GlobalDictionary, UserMasteryMatrix)
+            .join(
+                UserMasteryMatrix,
+                UserMasteryMatrix.entity_id == GlobalDictionary.id,
+            )
+            .where(UserMasteryMatrix.user_id == user_id)
+            .order_by(UserMasteryMatrix.next_review_date)
+        ).all()
+    return [
+        [
+            entity.token,
+            entity.type,
+            entity.meaning_note or "",
+            mastery.repetition,
+            str(mastery.next_review_date.date()),
+        ]
+        for entity, mastery in rows
+    ]
 
 
 # ------------------------------------------------------------------ wiring
@@ -284,41 +346,65 @@ def build_ui() -> gr.Blocks:
             )
 
         with gr.Tab("Quiz"):
-            fetch_btn = gr.Button("Get my quizzes")
+            fetch_btn = gr.Button("Get my quizzes", visible=False)
             quizzes_state = gr.State([])
+            poll = gr.Timer(10)
 
             def on_fetch(request: gr.Request):
-                return fetch_open_quizzes(_user_from_request(request))
+                quizzes = fetch_open_quizzes(_user_from_request(request))
+                # hide until the poll spots quizzes we are not yet showing
+                return quizzes, gr.update(visible=False)
 
-            fetch_btn.click(on_fetch, inputs=[], outputs=[quizzes_state])
+            fetch_btn.click(on_fetch, inputs=[], outputs=[quizzes_state, fetch_btn])
+
+            def reveal_when_new(quizzes, request: gr.Request):
+                shown = {q["quiz_id"] for q in quizzes}
+                waiting = open_quiz_ids(_user_from_request(request))
+                return gr.update(visible=bool(waiting - shown))
+
+            poll.tick(reveal_when_new, inputs=[quizzes_state], outputs=[fetch_btn])
 
             @gr.render(inputs=quizzes_state)
             def render_quizzes(quizzes):
                 if not quizzes:
-                    gr.Markdown("No quizzes waiting — go learn something!")
+                    gr.Markdown(
+                        "No quiz on screen. When one is ready, a button "
+                        "appears here — or go save some words in Learn!"
+                    )
                     return
+                total = sum(len(q["questions"]) for q in quizzes)
+                gr.Markdown(f"### Your questions ({total})")
+                components, number = [], 0
                 for quiz in quizzes:
-                    gr.Markdown(f"### Quiz #{quiz['quiz_id']}")
-                    components = []
                     for q in quiz["questions"]:
+                        number += 1
                         question = q["question"]
+                        label = f"{number}. {question['prompt_text']}"
                         if question["question_type"] == "mcq":
                             components.append(
-                                gr.Radio(
-                                    choices=question["choices"],
-                                    label=question["prompt_text"],
-                                )
+                                gr.Radio(choices=question["choices"], label=label)
                             )
                         else:
-                            components.append(
-                                gr.Textbox(label=question["prompt_text"])
-                            )
-                    feedback = gr.Markdown()
-                    submit = gr.Button(f"Submit quiz #{quiz['quiz_id']}")
+                            components.append(gr.Textbox(label=label))
+                feedback = gr.Markdown()
+                submit = gr.Button("Submit answers")
 
-                    def on_submit(*values, _quiz=quiz):
-                        return _submit_one_quiz(_quiz, values)
+                def on_submit(*values, _quizzes=quizzes):
+                    return submit_all_quizzes(_quizzes, values)
 
-                    submit.click(on_submit, inputs=components, outputs=[feedback])
+                submit.click(on_submit, inputs=components, outputs=[feedback])
+
+        with gr.Tab("My words"):
+            words_table = gr.Dataframe(
+                headers=["word", "type", "meaning", "streak", "next review"],
+                interactive=False,
+            )
+            refresh_btn = gr.Button("Refresh")
+
+            def on_words(request: gr.Request):
+                return fetch_saved_words(_user_from_request(request))
+
+            demo.load(on_words, outputs=[words_table])
+            refresh_btn.click(on_words, inputs=[], outputs=[words_table])
 
     return demo

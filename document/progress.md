@@ -137,6 +137,19 @@ live LLM probe through Groq succeeds.
       adds it); must also be set on the deploy platform
     - 6 tests; 77 total pass, ruff clean. ALL P0 CODE COMPLETE.
 
+12. UI polish from Catherine's live testing (2026-07-18):
+    - "My words" tab: mastery matrix table (word/type/meaning/streak/next
+      review), loads on open + Refresh button
+    - Quiz tab merged: all open quizzes render as ONE numbered question
+      list, no quiz-id labels, one Submit; per-quiz submission + the 409
+      guard still apply underneath
+    - "Get my quizzes" hides after fetch; a 10s gr.Timer polls for quiz ids
+      not on screen and reveals the button again when new ones arrive
+    - Noted: a word appearing in two open quizzes advances SM-2 twice (each
+      quiz = one review; sweep's open-work guard keeps this rare)
+    - 79 tests pass. Owner-login "nothing happens" was user-side: OWNER_SECRET
+      must be a Render env var + visit /login?key=... once (not just refresh)
+
 ## Next up
 
 1. **Always-on deploy** — the last P0; blocked on the hosting decision

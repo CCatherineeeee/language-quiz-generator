@@ -11,7 +11,15 @@ from app.db import Base
 from app.models import GlobalDictionary, PendingQuiz, User, UserMasteryMatrix
 from app.services.analysis import AmbiguityResult, InputCheckResult
 from app.services.extraction import ExtractionResult
-from app.ui import ChatDeps, answers_from_values, chat_step, fetch_open_quizzes
+from app.ui import (
+    ChatDeps,
+    answers_from_values,
+    chat_step,
+    fetch_open_quizzes,
+    fetch_saved_words,
+    open_quiz_ids,
+    submit_all_quizzes,
+)
 
 CLEAN = InputCheckResult(has_issues=False, corrected_input="I learned soirée")
 TYPO = InputCheckResult(
@@ -198,6 +206,62 @@ def test_fetch_open_quizzes_and_answer_mapping(factory):
 
     with pytest.raises(ValueError):
         answers_from_values(quizzes[0]["questions"], [None])  # unanswered
+
+
+def test_submit_all_merges_quizzes_and_survives_double_submit(factory):
+    q = {
+        "question_type": "mcq",
+        "prompt_text": "La ___ était réussie.",
+        "choices": ["soirée", "soir", "nuit", "journée"],
+        "correct_index": 0,
+        "expected_answer": None,
+        "explanation": "feminine noun fits",
+        "tested_point": "soirée",
+    }
+    with factory() as s:
+        entity = GlobalDictionary(token="soirée", type="root_noun", language="fr")
+        s.add(entity)
+        s.flush()
+        s.add(UserMasteryMatrix(
+            user_id=1, entity_id=entity.id, next_review_date=datetime.now(UTC),
+            interval_days=0, ease_factor=2.5, repetition=0,
+        ))
+        for _ in range(2):  # two one-question quizzes, shown merged
+            s.add(PendingQuiz(
+                user_id=1,
+                quiz_data={"questions": [{"entity_id": entity.id, "question": q,
+                                          "judge_overall": 5}]},
+                entity_ids=[entity.id],
+            ))
+        s.commit()
+
+    quizzes = fetch_open_quizzes(1, factory)
+    assert open_quiz_ids(1, factory) == {qz["quiz_id"] for qz in quizzes}
+
+    feedback = submit_all_quizzes(quizzes, ["soirée", "soirée"], factory)
+    assert "1. ✅" in feedback and "2. ✅" in feedback
+    assert open_quiz_ids(1, factory) == set()  # both marked COMPLETED
+
+    again = submit_all_quizzes(quizzes, ["soirée", "soirée"], factory)
+    assert "already submitted" in again  # SM-2 not advanced twice
+
+    words = fetch_saved_words(1, factory)
+    # streak is 2: the word appeared in BOTH quizzes, and each quiz is its own
+    # review (the 409 guard protects against resubmitting the SAME quiz; the
+    # sweep's open-work guard is what keeps two open quizzes from sharing words)
+    assert words[0][0] == "soirée" and words[0][3] == 2
+
+
+def test_submit_all_requires_every_answer(factory):
+    quizzes = [{"quiz_id": 1, "questions": [{
+        "entity_id": 1,
+        "question": {"question_type": "mcq", "prompt_text": "x",
+                     "choices": ["a", "b", "c", "d"], "correct_index": 0,
+                     "expected_answer": None, "explanation": "e",
+                     "tested_point": "t"},
+        "judge_overall": 5}]}]
+    msg = submit_all_quizzes(quizzes, [None], factory)
+    assert "answer every question" in msg
 
 
 def test_mounted_app_serves_gradio_and_api():
