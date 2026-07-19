@@ -12,7 +12,7 @@ import json
 from pydantic import BaseModel, Field
 
 from app.llm.client import LLMClient
-from app.prompts import EXTRACTION_SYSTEM_V1
+from app.prompts import EXTRACTION_SYSTEM_V2
 
 
 class ExtractedItem(BaseModel):
@@ -44,7 +44,7 @@ def extract_knowledge(
     client = client or LLMClient()
     payload = {"message": text, "resolved_meaning": resolved_meaning}
     messages = [
-        {"role": "system", "content": EXTRACTION_SYSTEM_V1.format(language=language)},
+        {"role": "system", "content": EXTRACTION_SYSTEM_V2.format(language=language)},
         {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
     ]
     result = client.complete_structured(

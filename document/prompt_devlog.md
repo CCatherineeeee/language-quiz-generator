@@ -165,3 +165,33 @@ Live probe (7 cases), one iteration:
   positives here.
 
 Goldens: evals/golden/quiz_generation.jsonl, evals/golden/grading.jsonl.
+
+## EXTRACTION_SYSTEM V1 -> V2 (2026-07-18)
+
+Production-found (Catherine, live chat on the deployed app): after the
+ambiguity question "'never mind', 'too bad', or both?", the answer
+"just too bad" was saved as meaning_note "just too bad" — filler included.
+
+Root cause: V1 literally instructed "copy resolved_meaning when given". The
+resolved_meaning is a conversational ANSWER, not a clean label; copying was
+the wrong contract. Same line made "both" a latent bug: it would have been
+copied as a meaning_note instead of producing one item per sense.
+
+V2 change: resolved_meaning is now framed as the user's conversational answer
+to "which sense did you mean?", with three rules — distill to a short
+dictionary-style sense (drop filler), "both"-type answers emit one item per
+sense, never invent an unchosen sense.
+
+Live probe (4 cases): 4/4 on first iteration —
+- "just too bad" -> meaning_note "too bad"
+- "both" (soirée) -> two items, evening + party
+- "I think the second one, the party" -> "party"
+- no resolved_meaning (je parle) -> unchanged V1 behaviour (regression)
+
+Known limit, accepted: a bare ordinal answer ("the second one") cannot
+resolve, because the extractor never sees the candidate list — the UI only
+forwards the user's text. Fix would be passing the ambiguity candidates
+through to extraction; deferred until it bites in practice.
+
+Goldens: resolved-meaning-filler / -both / -verbose in
+evals/golden/extraction.jsonl.
